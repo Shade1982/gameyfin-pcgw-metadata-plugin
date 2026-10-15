@@ -20,7 +20,6 @@ import org.gameyfin.pluginapi.gamemetadata.Platform
 import org.pf4j.Extension
 import org.pf4j.PluginWrapper
 import org.slf4j.LoggerFactory
-import java.net.URI
 
 class PcGamingWikiPlugin(wrapper: PluginWrapper) : GameyfinPlugin(wrapper) {
     @Suppress("Unused")
@@ -65,7 +64,7 @@ class PcGamingWikiPlugin(wrapper: PluginWrapper) : GameyfinPlugin(wrapper) {
                 val metadataResults = rankedResults.mapNotNull { result ->
                     val page = WikiPage(result.pageid, result.title)
                     val wikitext = runBlocking { fetchWikitext(page.pageid) }
-                    val metadata = toMetadata(page, wikitext, runBlocking { fetchCover(wikitext) })
+                    val metadata = toMetadata(page, wikitext)
                     val metadataPlatforms = metadata.platforms.orEmpty()
                     val matchesPlatform = platformFilter.isEmpty() || metadataPlatforms.isEmpty() ||
                         metadataPlatforms.intersect(platformFilter).isNotEmpty()
@@ -90,7 +89,7 @@ class PcGamingWikiPlugin(wrapper: PluginWrapper) : GameyfinPlugin(wrapper) {
             return try {
                 val page = runBlocking { fetchPage(pageId) } ?: return null
                 val wikitext = runBlocking { fetchWikitext(page.pageid) }
-                toMetadata(page, wikitext, runBlocking { fetchCover(wikitext) })
+                toMetadata(page, wikitext)
                     .also { metadataCache[id] = it }
             } catch (e: Exception) {
                 log.warn("Failed to fetch PCGamingWiki page $id: ${e.message}")
@@ -196,28 +195,7 @@ class PcGamingWikiPlugin(wrapper: PluginWrapper) : GameyfinPlugin(wrapper) {
             return response.body<ParseResponse>().parse.wikitext.content
         }
 
-        private suspend fun fetchCover(wikitext: String?): URI? {
-            val filename = WikiTextParser.coverFilename(wikitext.orEmpty()) ?: return null
-            val response = client.get(API_URL) {
-                header("User-Agent", USER_AGENT)
-                parameter("action", "query")
-                parameter("prop", "imageinfo")
-                parameter("iiprop", "url")
-                parameter("iiurlwidth", "600")
-                parameter("titles", "File:$filename")
-                parameter("format", "json")
-                parameter("formatversion", "2")
-            }
-            if (response.status.value !in 200..299) {
-                log.warn("PCGamingWiki cover lookup returned HTTP {} for '{}'", response.status.value, filename)
-                return null
-            }
-            val imageUrl = response.body<ImageInfoResponse>().query?.pages
-                ?.firstOrNull()?.imageinfo?.firstOrNull()?.let { it.thumburl ?: it.url }
-            return imageUrl?.let(URI::create)
-        }
-
-        private fun toMetadata(page: WikiPage, wikitext: String?, coverUrl: URI?): GameMetadata {
+        private fun toMetadata(page: WikiPage, wikitext: String?): GameMetadata {
             val wiki = wikitext.orEmpty()
             val originalId = page.pageid.toString()
 
@@ -225,7 +203,8 @@ class PcGamingWikiPlugin(wrapper: PluginWrapper) : GameyfinPlugin(wrapper) {
                 originalId = originalId,
                 title = page.title,
                 description = WikiTextParser.description(wiki),
-                coverUrls = coverUrl?.let(::setOf),
+                // images.pcgamingwiki.com serves a Cloudflare challenge to server-side downloads.
+                coverUrls = null,
                 release = WikiTextParser.releaseDate(wiki),
                 developedBy = WikiTextParser.developers(wiki).takeIf { it.isNotEmpty() }?.toSet(),
                 publishedBy = WikiTextParser.publishers(wiki).takeIf { it.isNotEmpty() }?.toSet(),
@@ -283,18 +262,6 @@ private data class WikiPage(
     val pageid: Int,
     val title: String
 )
-
-@Serializable
-private data class ImageInfoResponse(val query: ImageInfoQuery? = null)
-
-@Serializable
-private data class ImageInfoQuery(val pages: List<ImageInfoPage> = emptyList())
-
-@Serializable
-private data class ImageInfoPage(val imageinfo: List<ImageInfo>? = null)
-
-@Serializable
-private data class ImageInfo(val thumburl: String? = null, val url: String? = null)
 
 @Serializable
 private data class ParseResponse(val parse: ParseResult)

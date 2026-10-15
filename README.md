@@ -6,7 +6,11 @@ that searches [PCGamingWiki](https://www.pcgamingwiki.com/) for game metadata.
 ## Features
 
 - Searches PCGamingWiki game pages by title.
-- Provides introductory descriptions and cover thumbnails when available.
+- Provides introductory descriptions when available. Images are not provided:
+  PCGamingWiki's image host (`images.pcgamingwiki.com`) is protected by a
+  Cloudflare challenge and returns an HTML page instead of the image to
+  server-side downloads. Gameyfin would store that page as the cover, replacing
+  a working image from another provider.
 - Extracts developer, publisher, release date, and supported platforms from the
 	game's infobox.
 - Uses the public MediaWiki API and caches fetched metadata in memory.
@@ -20,6 +24,14 @@ platforms are filtered against the library's platform selection. Metadata is
 cached in memory with a 256-entry least-recently-used limit. Empty searches and
 platform-filtered results are reported at debug level; API failures are logged
 as warnings.
+
+## Using with other providers
+
+Gameyfin merges results field by field: for each field, the first provider with
+a non-empty value wins, in plugin priority order. Values are never combined, so
+a single genre from this plugin replaces a longer list from another provider.
+PCGamingWiki is best used as a supplement, so place it below your primary
+providers (for example IGDB or Steam) in the plugin overview.
 
 ## Build
 

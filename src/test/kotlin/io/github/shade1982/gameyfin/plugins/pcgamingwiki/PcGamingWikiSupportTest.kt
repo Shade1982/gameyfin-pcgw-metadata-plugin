@@ -94,7 +94,6 @@ class PcGamingWikiSupportTest {
             }}
         """.trimIndent()
 
-        assertEquals("Portal cover.jpg", WikiTextParser.coverFilename(wikitext))
         assertEquals(listOf("Valve Corporation"), WikiTextParser.developers(wikitext))
         assertEquals(listOf("Valve Corporation"), WikiTextParser.publishers(wikitext))
         assertEquals(setOf(Platform.PC_MICROSOFT_WINDOWS), WikiTextParser.platforms(wikitext))

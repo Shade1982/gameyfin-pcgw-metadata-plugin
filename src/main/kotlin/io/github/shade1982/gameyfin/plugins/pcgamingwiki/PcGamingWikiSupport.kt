@@ -79,14 +79,6 @@ internal object WikiTextParser {
 
     fun publishers(wikitext: String): List<String> = rowValues(wikitext, "publisher")
 
-    fun coverFilename(wikitext: String): String? = Regex("(?im)^\\|\\s*cover\\s*=\\s*([^\\n]+)")
-        .find(wikitext)
-        ?.groupValues?.get(1)
-        ?.let(::cleanWikiText)
-        ?.removePrefix("File:")
-        ?.trim()
-        ?.takeIf(String::isNotBlank)
-
     fun platforms(wikitext: String): Set<Platform> = releaseRowRegex.findAll(wikitext)
         .mapNotNull { platformFrom(it.groupValues[1]) }
         .toSet()
