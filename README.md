@@ -18,8 +18,12 @@ that searches [PCGamingWiki](https://www.pcgamingwiki.com/) for game metadata.
 ## Metadata lookup
 
 The provider checks for an exact page title first, then searches PCGamingWiki
-with MediaWiki pagination (up to five pages of 50 results). Exact title matches
-are ranked first. Results with unknown platform data are retained, while known
+with MediaWiki pagination (up to five pages of 50 results). Search results are
+only accepted when the title matches the query ignoring case and punctuation,
+is very similar to it, or continues it with more words (for example "Portal 2"
+matches "Portal 2: Community Edition"). Generic queries such as "Age of" or
+"The" therefore match nothing instead of an arbitrary game. Results with
+unknown platform data are retained, while known
 platforms are filtered against the library's platform selection. Metadata is
 cached in memory with a 256-entry least-recently-used limit. Empty searches and
 platform-filtered results are reported at debug level; API failures are logged

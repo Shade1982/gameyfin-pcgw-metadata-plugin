@@ -27,19 +27,57 @@ class PcGamingWikiSupportTest {
     }
 
     @Test
-    fun `ranking respects minimum score and result limit`() {
-        val results = rankSearchResults(
-            title = "Portal",
-            results = listOf(
-                SearchResult(1, "Portal 2"),
-                SearchResult(2, "A completely unrelated game")
-            ),
-            maxResults = 1
+    fun `generic queries only match the exact title`() {
+        val generic = listOf(
+            SearchResult(1, "Age of Wonders II"),
+            SearchResult(2, "Arena: An Age of Barbarians Story"),
+            SearchResult(3, "Age of Empires II: The Age of Kings")
         )
 
-        assertEquals(1, results.size)
-        assertEquals("Portal 2", results.single().title)
-        assertTrue(rankSearchResults("Portal", results, maxResults = 0).isEmpty())
+        assertTrue(rankSearchResults("Age of", generic, maxResults = 5).isEmpty())
+        assertTrue(rankSearchResults("The", listOf(SearchResult(4, "The Witcher 3: Wild Hunt")), maxResults = 5).isEmpty())
+        assertEquals(
+            listOf("Age of"),
+            rankSearchResults("Age of", generic + SearchResult(5, "Age of"), maxResults = 5).map { it.title }
+        )
+    }
+
+    @Test
+    fun `single word query does not match titles containing it`() {
+        val results = rankSearchResults(
+            "Portal",
+            listOf(SearchResult(1, "Portal Knights"), SearchResult(2, "Mind Portal")),
+            maxResults = 5
+        )
+
+        assertTrue(results.isEmpty())
+    }
+
+    @Test
+    fun `multi word query matches edition and subtitle suffixes`() {
+        val results = rankSearchResults(
+            "Portal 2",
+            listOf(SearchResult(1, "Mind Portal"), SearchResult(2, "Portal 2: Community Edition")),
+            maxResults = 5
+        )
+
+        assertEquals(listOf("Portal 2: Community Edition"), results.map { it.title })
+    }
+
+    @Test
+    fun `matching ignores case and punctuation and respects the result limit`() {
+        val candidates = listOf(SearchResult(1, "Half-Life 2"), SearchResult(2, "Half Life 2"))
+
+        assertEquals(2, rankSearchResults("half life 2", candidates, maxResults = 5).size)
+        assertEquals(1, rankSearchResults("HALF-LIFE 2", candidates, maxResults = 1).size)
+        assertTrue(rankSearchResults("Half-Life 2", candidates, maxResults = 0).isEmpty())
+    }
+
+    @Test
+    fun `non latin titles are compared rather than normalized to empty`() {
+        val results = rankSearchResults("ドラゴンクエスト", listOf(SearchResult(1, "ゲーム")), maxResults = 5)
+
+        assertTrue(results.isEmpty())
     }
 
     @Test

@@ -37,19 +37,36 @@ internal object SearchPagination {
     }
 }
 
+private val FILLER_WORDS = setOf("a", "an", "and", "in", "of", "the", "to")
+private const val MIN_SIMILARITY = 85
+
+internal fun normalizeTitle(value: String): String =
+    value.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
+
+// Generic queries such as "Age of" must not match every title that merely contains them.
+private fun titleMatchScore(query: String, title: String): Int? {
+    val normalizedQuery = normalizeTitle(query)
+    val normalizedTitle = normalizeTitle(title)
+    if (normalizedQuery.isEmpty() || normalizedTitle.isEmpty()) return null
+    if (normalizedQuery == normalizedTitle) return 100
+
+    val similarity = me.xdrop.fuzzywuzzy.FuzzySearch.ratio(normalizedQuery, normalizedTitle)
+    if (similarity >= MIN_SIMILARITY) return similarity
+
+    val significantWords = normalizedQuery.split(' ').count { it !in FILLER_WORDS }
+    if (significantWords >= 2 && normalizedTitle.startsWith("$normalizedQuery ")) return similarity
+    return null
+}
+
 internal fun rankSearchResults(
     title: String,
     results: Iterable<SearchResult>,
-    maxResults: Int,
-    minimumScore: Int = 55
+    maxResults: Int
 ): List<SearchResult> {
     if (maxResults <= 0) return emptyList()
     return results
-        .map { it to me.xdrop.fuzzywuzzy.FuzzySearch.weightedRatio(title.lowercase(), it.title.lowercase()) }
-        .filter { it.second >= minimumScore }
-        .sortedWith(compareByDescending<Pair<SearchResult, Int>> {
-            it.first.title.equals(title, ignoreCase = true)
-        }.thenByDescending { it.second })
+        .mapNotNull { result -> titleMatchScore(title, result.title)?.let { result to it } }
+        .sortedByDescending { it.second }
         .take(maxResults)
         .map { it.first }
 }
