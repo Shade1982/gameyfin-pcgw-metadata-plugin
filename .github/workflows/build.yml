@@ -2,6 +2,7 @@ name: Build
 
 on:
   push:
+    branches: ['**']
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -36,7 +37,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew --no-daemon jar
       - name: Verify tag matches Plugin-Version
-        run: grep -qx "Plugin-Version: ${GITHUB_REF_NAME#v}" src/main/resources/MANIFEST.MF
+        run: |
+          grep -qx "Plugin-Version: ${GITHUB_REF_NAME#v}" src/main/resources/MANIFEST.MF
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
