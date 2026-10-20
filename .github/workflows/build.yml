@@ -2,6 +2,7 @@ name: Build
 
 on:
   push:
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -19,3 +20,27 @@ jobs:
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew --no-daemon clean check
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew --no-daemon jar
+      - name: Verify tag matches Plugin-Version
+        run: grep -qx "Plugin-Version: ${GITHUB_REF_NAME#v}" src/main/resources/MANIFEST.MF
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" build/libs/pcgamingwiki-plugin-*.jar \
+            --title "PCGamingWiki Plugin ${GITHUB_REF_NAME#v}" --generate-notes
+          sha512sum build/libs/pcgamingwiki-plugin-*.jar
