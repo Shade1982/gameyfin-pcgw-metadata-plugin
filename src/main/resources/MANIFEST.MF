@@ -1,4 +1,4 @@
-Plugin-Version: 0.1.8
+Plugin-Version: 0.1.9
 Plugin-Class: io.github.shade1982.gameyfin.plugins.pcgamingwiki.PcGamingWikiPlugin
 Plugin-Id: io.github.shade1982.gameyfin.plugins.pcgamingwiki
 Plugin-Name: PCGamingWiki Metadata
