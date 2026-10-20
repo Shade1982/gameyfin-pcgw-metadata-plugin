@@ -1,0 +1,16 @@
+[versions]
+kotlin = "2.4.10"
+ksp = "2.3.12"
+gameyfin-plugin-api = "2.5.0"
+pf4j = "3.15.0"
+pf4j-ksp = "2.4.10-1.0.5"
+
+[libraries]
+gameyfin-plugin-api = { module = "org.gameyfin:plugin-api", version.ref = "gameyfin-plugin-api" }
+pf4j = { module = "org.pf4j:pf4j", version.ref = "pf4j" }
+pf4j-ksp = { module = "care.better.pf4j:pf4j-kotlin-symbol-processing", version.ref = "pf4j-ksp" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

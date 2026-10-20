@@ -100,6 +100,30 @@ class PcGamingWikiSupportTest {
     }
 
     @Test
+    fun `pagination continues when earlier pages are filtered out`() = runBlocking {
+        val offsets = mutableListOf<Int>()
+        val results = SearchPagination.collect(
+            maxPages = 5,
+            fetchPage = { offset ->
+                offsets += offset
+                val page = when (offset) {
+                    0 -> SearchBatch(listOf(SearchResult(1, "Portal 1")), 1)
+                    1 -> SearchBatch(listOf(SearchResult(2, "Portal 2"), SearchResult(3, "Portal 3")), 3)
+                    else -> SearchBatch(listOf(SearchResult(4, "Portal 4")), null)
+                }
+                SearchBatch(
+                    results = page.results.filter { it.pageid >= 2 },
+                    nextOffset = page.nextOffset
+                )
+            },
+            shouldStop = { it.size >= 2 }
+        )
+
+        assertEquals(listOf(0, 1), offsets)
+        assertEquals(listOf(2, 3), results.map { it.pageid })
+    }
+
+    @Test
     fun `pagination stops when API has no continuation`() = runBlocking {
         var requests = 0
         val results = SearchPagination.collect(

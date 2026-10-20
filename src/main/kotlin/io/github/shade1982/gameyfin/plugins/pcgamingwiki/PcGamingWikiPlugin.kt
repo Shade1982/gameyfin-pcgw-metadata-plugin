@@ -14,14 +14,14 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.gameyfin.pluginapi.core.wrapper.GameyfinPlugin
+import org.gameyfin.pluginapi.core.wrapper.PluginContext
 import org.gameyfin.pluginapi.gamemetadata.GameMetadata
 import org.gameyfin.pluginapi.gamemetadata.GameMetadataProvider
 import org.gameyfin.pluginapi.gamemetadata.Platform
 import org.pf4j.Extension
-import org.pf4j.PluginWrapper
 import org.slf4j.LoggerFactory
 
-class PcGamingWikiPlugin(wrapper: PluginWrapper) : GameyfinPlugin(wrapper) {
+class PcGamingWikiPlugin(context: PluginContext) : GameyfinPlugin(context) {
     @Suppress("Unused")
     @Extension(ordinal = 3)
     class PcGamingWikiMetadataProvider : GameMetadataProvider {
@@ -55,26 +55,11 @@ class PcGamingWikiPlugin(wrapper: PluginWrapper) : GameyfinPlugin(wrapper) {
             if (title.isBlank() || maxResults <= 0) return emptyList()
 
             return try {
-                val results = runBlocking { search(title, maxResults) }
-                val rankedResults = rankSearchResults(title, results, maxResults)
-                if (rankedResults.isEmpty()) {
-                    log.debug("PCGamingWiki search returned no matches for '{}' ({} API results)", title, results.size)
-                    return emptyList()
-                }
-                val metadataResults = rankedResults.mapNotNull { result ->
-                    val page = WikiPage(result.pageid, result.title)
-                    val wikitext = runBlocking { fetchWikitext(page.pageid) }
-                    val metadata = toMetadata(page, wikitext)
-                    val metadataPlatforms = metadata.platforms.orEmpty()
-                    val matchesPlatform = platformFilter.isEmpty() || metadataPlatforms.isEmpty() ||
-                        metadataPlatforms.intersect(platformFilter).isNotEmpty()
-                    if (matchesPlatform) {
-                        metadataCache[metadata.originalId] = metadata
-                        metadata
-                    } else null
-                }
+                val metadataResults = runBlocking { search(title, platformFilter, maxResults) }
                 if (metadataResults.isEmpty() && platformFilter.isNotEmpty()) {
                     log.debug("PCGamingWiki returned matches for '{}' but none matched platforms {}", title, platformFilter)
+                } else if (metadataResults.isEmpty()) {
+                    log.debug("PCGamingWiki search returned no matches for '{}'", title)
                 }
                 metadataResults
             } catch (e: Exception) {
@@ -97,29 +82,68 @@ class PcGamingWikiPlugin(wrapper: PluginWrapper) : GameyfinPlugin(wrapper) {
             }
         }
 
-        private suspend fun search(title: String, maxResults: Int): List<SearchResult> {
+        private suspend fun search(
+            title: String,
+            platformFilter: Set<Platform>,
+            maxResults: Int
+        ): List<GameMetadata> {
             val exactMatch = runCatching { searchExactTitle(title) }
                 .onFailure { log.debug("Exact PCGamingWiki lookup failed for '{}': {}", title, it.message) }
                 .getOrNull()
-            if (maxResults == 1 && exactMatch != null) return listOf(exactMatch)
+            val candidates = mutableListOf<SearchResult>()
+            val metadataByPageId = mutableMapOf<Int, GameMetadata>()
+            exactMatch?.let(candidates::add)
 
-            val searchResults = SearchPagination.collect(
-                maxPages = MAX_SEARCH_PAGES,
-                fetchPage = { offset -> searchPage(title, offset) },
-                shouldStop = { results ->
-                    val candidates = buildList {
-                        exactMatch?.let(::add)
-                        results.forEach { result -> if (none { it.pageid == result.pageid }) add(result) }
+            suspend fun matchingMetadata(): List<GameMetadata> {
+                val matches = mutableListOf<GameMetadata>()
+                for (result in rankSearchResults(title, candidates, candidates.size)) {
+                    val metadata = metadataByPageId[result.pageid]
+                        ?: metadataCache[result.pageid.toString()]?.also {
+                            metadataByPageId[result.pageid] = it
+                        }
+                        ?: run {
+                            val page = WikiPage(result.pageid, result.title)
+                            val wikitext = fetchWikitext(page.pageid)
+                            toMetadata(page, wikitext).also {
+                                metadataByPageId[result.pageid] = it
+                            }
+                        }
+                    val metadataPlatforms = metadata.platforms.orEmpty()
+                    if (platformFilter.isEmpty() || metadataPlatforms.isEmpty() ||
+                        metadataPlatforms.intersect(platformFilter).isNotEmpty()
+                    ) {
+                        metadataCache[metadata.originalId] = metadata
+                        matches += metadata
+                        if (matches.size >= maxResults) break
                     }
-                    rankSearchResults(title, candidates, maxResults).size >= maxResults
                 }
-            )
-            return buildList {
-                exactMatch?.let(::add)
-                searchResults.forEach { result ->
-                    if (none { it.pageid == result.pageid }) add(result)
-                }
+                return matches
             }
+
+            val exactMatches = matchingMetadata()
+            if (exactMatches.size >= maxResults) return exactMatches
+
+            val collected = SearchPagination.collect(
+                maxPages = MAX_SEARCH_PAGES,
+                fetchPage = { offset ->
+                    val page = searchPage(title, offset)
+                    page.results.forEach { result ->
+                        if (candidates.none { candidate -> candidate.pageid == result.pageid }) {
+                            candidates += result
+                        }
+                    }
+                    SearchBatch(matchingMetadata(), page.nextOffset)
+                },
+                shouldStop = { results -> results.distinctBy { it.originalId }.size >= maxResults }
+            )
+            val results = collected + exactMatches
+            val matchingIds = results.mapTo(mutableSetOf()) { it.originalId }
+            return rankSearchResults(title, candidates, candidates.size)
+                .asSequence()
+                .mapNotNull { metadataByPageId[it.pageid] }
+                .filter { it.originalId in matchingIds }
+                .take(maxResults)
+                .toList()
         }
 
         private suspend fun searchExactTitle(title: String): SearchResult? {

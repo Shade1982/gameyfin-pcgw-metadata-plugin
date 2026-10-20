@@ -1,9 +1,9 @@
 import java.util.jar.Manifest
 
 plugins {
-    kotlin("jvm") version "2.2.20"
-    id("com.google.devtools.ksp") version "2.2.20-2.0.3"
-    kotlin("plugin.serialization") version "2.2.20"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 group = "io.github.shade1982.gameyfin.plugins"
@@ -21,14 +21,14 @@ repositories {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 
 dependencies {
-    compileOnly("org.gameyfin:plugin-api:2.3.3")
-    compileOnly("org.pf4j:pf4j:3.13.0")
-    ksp("care.better.pf4j:pf4j-kotlin-symbol-processing:2.2.20-1.0.3")
+    compileOnly(libs.gameyfin.plugin.api)
+    compileOnly(libs.pf4j)
+    ksp(libs.pf4j.ksp)
     compileOnly("org.slf4j:slf4j-api:2.0.9")
 
     val ktorVersion = "3.1.3"
@@ -38,13 +38,15 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion") { exclude(group = "org.slf4j") }
     implementation("me.xdrop:fuzzywuzzy:1.4.0")
 
-    testImplementation("org.gameyfin:plugin-api:2.3.3")
+    testImplementation(libs.gameyfin.plugin.api)
     testImplementation(kotlin("test-junit5"))
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.11.4")
 }
 
 tasks.test {
     useJUnitPlatform()
+    dependsOn(tasks.jar)
+    systemProperty("pluginJar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
 }
 
 tasks.jar {

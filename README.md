@@ -39,7 +39,7 @@ providers (for example IGDB or Steam) in the plugin overview.
 
 ## Build
 
-Requires JDK 21 or newer.
+Requires JDK 25 or newer to compile against the Gameyfin 2.5.0 plugin API.
 
 ```sh
 ./gradlew build
@@ -50,6 +50,10 @@ Run the focused parser, ranking, pagination, and cache tests with:
 ```sh
 ./gradlew test
 ```
+
+The test task also checks that the packaged JAR contains the PF4J extension
+index and can be loaded with the Gameyfin 2.5.0 `PluginContext` API. CI runs
+these checks with JDK 25.
 
 ## Installation
 
