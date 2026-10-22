@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 class PcGamingWikiPluginCompatibilityTest {
     @Test
-    fun `packaged plugin loads with Gameyfin 2_5 PluginContext`() {
+    fun `packaged plugin loads with Gameyfin 2_5_1 PluginContext`() {
         val pluginJar = File(requireNotNull(System.getProperty("pluginJar")))
         assertTrue(pluginJar.isFile)
 

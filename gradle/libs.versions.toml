@@ -1,7 +1,7 @@
 [versions]
 kotlin = "2.4.10"
 ksp = "2.3.12"
-gameyfin-plugin-api = "2.5.0"
+gameyfin-plugin-api = "2.5.1"
 pf4j = "3.15.0"
 pf4j-ksp = "2.4.10-1.0.5"
 
